@@ -1,6 +1,10 @@
 import multiprocessing
 import warnings
 
+from pandas.compat import numpy
+
+from LDADE import LDADE, UserTestConfig
+
 warnings.simplefilter("ignore")
 import html
 
@@ -18,6 +22,7 @@ import pandas as pd
 import random
 import gensim
 from gensim.models import EnsembleLda
+from collections import OrderedDict
 
 # create English stop words list
 
@@ -135,11 +140,10 @@ class LDADocument:
 
 
 class SEALDAModel:
-    def __init__(self, training_data=None, use_multicore=True, coherence=0.6, num_core=-1,
+    def __init__(self, training_data=None, use_multicore=True, num_core=-1,
                  model_name="graphql"):
 
         self.use_multicore = use_multicore
-        self.target_coherence = coherence
         self.model_name = model_name
         if num_core == -1:
             self.workers = multiprocessing.cpu_count()
@@ -204,6 +208,22 @@ class SEALDAModel:
         print("Best stability: " + str(best_estimated_stability))
         print("Best cv: " + str(best_cv))
 
+        config = UserTestConfig()
+        config["data_samples"] = self.token_collection
+        config["learners_para_bounds"] = [(best_topic_count, best_topic_count), (0.1, 1), (0.01, 1)]
+        learner_para = OrderedDict()
+        learner_para["n_components"] = best_topic_count  # topics
+        learner_para["doc_topic_prior"] = 0.1  # alpha
+        learner_para["topic_word_prior"] = 0.01  # beta
+        config["learners_para"] = learner_para
+
+        config["ldaMultiWorkers"] = self.workers
+        config["max_iter"] = best_iteration_count
+
+        (ind, fit) = LDADE(config)
+        print("Index" + str(ind))
+        print("Fit" + str(fit))
+
         return best_model, best_topic_count, best_iteration_count, best_cv, best_estimated_stability, cv_chart_data
 
     def find_single_model(self, topic_count, repetitions=25, iteration_count=1000):
@@ -265,6 +285,7 @@ class SEALDAModel:
         self.token_collection = replace_bigram(doc_collection)
 
         self.dictionary = corpora.Dictionary(self.token_collection)
+
         self.dictionary.filter_extremes(no_below=20, no_above=0.2, keep_n=20000)
         self.corpus = [self.dictionary.doc2bow(text) for text in self.token_collection]
         print("Finished data cleanup..")
@@ -305,17 +326,6 @@ class SEALDAModel:
         # print(differences)
         avg_score = sum(differences) / len(differences)
         return avg_score
-
-    def estimate_model_stability(self, topic_count, iteration_count, repeat=10):
-        sum = 0.0
-        model1 = self.prepare_model(topic_count, iteration_count)
-        for i in range(0, repeat):  # create repeat models
-            model2 = self.prepare_model(topic_count, iteration_count)
-            topic_similarity_score = self.get_jaccard_similarity(model1, model2)
-            sum += topic_similarity_score
-            model1 = model2
-        avg_stability = sum / repeat
-        return avg_stability
 
     def create_ensemble_model(self, topic_count):
         return EnsembleLda(
