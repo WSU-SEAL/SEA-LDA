@@ -226,7 +226,7 @@ def ldaGensimScore(data_samples, doc_topic_prior, max_iter, n_components, r, ran
         prev_model = model
         stability_score = sum_stability / repetitions
 
-        print("\t Repetition: ["
+        print("LDA Score\n\tRepetition: ["
               + str(repeat)
               + "],\tAccumulated Stability: ["
               + str(stability_score)

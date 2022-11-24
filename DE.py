@@ -46,7 +46,7 @@ class DE(object):
         self.threads = (
             max(2, math.ceil(mp.cpu_count() * 0.1)) if threads is None else threads
         )
-        # self.threads = -1 # todo remove later
+        self.threads = -1 # todo remove later
         seed(random_state)
         np.random.seed(random_state)
 
