@@ -5,7 +5,7 @@ bash clean.sh
 
 
 # Run GraphQL Posts
-python -Wignore SEA_LDA.py --maxtopic 16 --mintopic 5 --steptopic 1 --repetitions 6 --miniteration 1000 --maxiteration 1001 --stepiteration 5 --modelname "graphql" --sourcefileformat "xlsx"
+python -Wignore SEA_LDA.py --maxtopic 16 --mintopic 5 --steptopic 1 --repetitions 10 --miniteration 1000 --maxiteration 1001 --stepiteration 5 --modelname "graphql" --sourcefileformat "xlsx"
 
 
 # Run Refactor Posts

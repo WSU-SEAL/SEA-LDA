@@ -57,7 +57,8 @@ domain_terms = ['graphql', 'apollo', 'gql', 'something', 'look', 'see', 'find', 
                 'song', 'artist', 'episode', 'friend', 'movie', 'employee', 'human', 'customer', 'vehicle', 'game'
                 'document', 'var', 'player', 'p', 'todo', 'req', 'res', 'go', 'actual', 'url', 'uri', 'print', 'run'
                 'contain', 'add', 'provide', 'pm', 'err', 'article', 'first', 'list', 'show', 'inside', 'path',
-                'detail', 'implement', 'context', 'text', 'action', 'description', 'time']
+                'detail', 'implement', 'context', 'text', 'action', 'description', 'time', 'file', 'mutate',
+                'mutation', 'user', 'option', 'create', 'price', 'application']
 
 # Refactor
 # domain_terms = ['name', 'string', 'public', 'int', 'x', 'y', 'f', 'n', 'b', 'c', 'j', 'g', 'v', 'h', 'i', 'see',
