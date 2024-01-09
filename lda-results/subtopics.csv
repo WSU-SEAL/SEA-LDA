@@ -1,0 +1,15 @@
+topic_id,intertopic_distance_map_index,topic_name, # of subtopics, subtopics
+0,8,Payload Management,5,"Pagination, Mime-type Uploads, JSON Content, Fragments, Enum Types"
+1,5,Development Tooling,2,"Build tooling (Netlify), Deploy Tooling (Webpack)"
+2,7,GraphQL Modeling,2,"Graphene, Prisma"
+3,11,Ecommerce Product Management,2,"Product Testing, Product Selection (Filter, sort, limit, key, slug)"
+4,1,Microservice Architecture,4,
+5,10,Security Management,3,"Account Registration, User Authentication (Client-side), User Authorization (Server-side)"
+6,12,GraphQL Client (Apollo),4,"User Interface, Apollo Links, State Management, Cache Management"
+7,9,Pubsub Systems,4,"Apollo Client, Websockets, Appsync, Event Modeling"
+8,3,Query & Mutation,3,
+9,14,TypeDefs & Resolvers (NodeJS),3,"TypeDefs, Mongoose, NodeJS"
+10,13,Prisma,2,"Schema generation/migration, Deployment (Docker)"
+11,6,GraphQL Server (Apollo),5,
+12,2,Gatsby,4,
+13,4,GraphQL Java,4,"Date Types (Scalar), Dependency Management, Java Constructs, Entity Modeling (Nullable*)"
