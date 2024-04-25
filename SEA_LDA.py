@@ -1,13 +1,16 @@
 import multiprocessing
 import warnings
+from xml.etree import ElementTree
+
+from pandas.compat import numpy
+
+from LDADE import LDADE, UserTestConfig
 
 warnings.simplefilter("ignore")
 import html
-import csv
 
 import re
 import nltk
-import openpyxl
 from nltk.stem.snowball import SnowballStemmer
 from gensim import corpora, models
 from gensim.models.ldamulticore import LdaMulticore
@@ -20,6 +23,7 @@ import pandas as pd
 import random
 import gensim
 from gensim.models import EnsembleLda
+from collections import OrderedDict
 
 # create English stop words list
 
@@ -27,36 +31,53 @@ stemmer = SnowballStemmer("english")
 
 my_stopwords = ['ourselves', 'hers', 'between', 'yourself', 'but', 'again', 'there', 'about', 'once', 'during', 'out',
                 'very', 'having', 'with', 'they', 'own', 'an', 'be', 'some', 'for', 'do', 'its', 'yours', 'such',
-                'into', 'however', 'every', 'like', 'want', 'fine', 'one', 'two', 'make', 'thing', 'every', 'able'
+                'into', 'however', 'every', 'like', 'want', 'fine', 'one', 'two', 'make', 'thing', 'every', 'able',
                 'of', 'most', 'itself', 'other', 'off', 'is', 's', 'am', 'or', 'who', 'as', 'from', 'him', 'each',
-                'the', 'work', 'set', 'get', 'similar', 'change', 'must', 'above', 'both', 'need',
-                'themselves', 'until', 'below', 'are', 'we', 'these', 'your', 'his', 'through', 'don', 'nor', 'me',
+                'the', 'work', 'set', 'get', 'similar', 'change', 'must', 'above', 'both', 'need', 'also',
+                'may', 'themselves', 'much', 'maybe', 'instead'
+                'until', 'below', 'are', 'we', 'these', 'your', 'his', 'through', 'don', 'nor', 'me',
                 'were', 'her', 'more', 'himself', 'this', 'down', 'should', 'could', 'would', 'our', 'their', 'while',
                 'up', 'to', 'ours', 'had', 'she', 'all', 'no', 'when', 'at', 'any', 'before', 'them', 'same', 'and',
                 'been', 'have', 'in', 'will', 'on', 'does', 'yourselves', 'then', 'that', 'because', 'what', 'over',
                 'why', 'so', 'can', 'did', 'not', 'now', 'under', 'he', 'you', 'herself', 'has', 'just', 'where', 'too',
                 'only', 'myself', 'which', 'those', 'i', 'after', 'few', 'whom', 't', 'being', 'if', 'theirs', 'my',
-                'against', 'a', 'by', 'doing', 'it', 'how', 'further', 'was', 'here', 'than', 'xa', 'use']
+                'against', 'a', 'by', 'doing', 'it', 'how', 'further', 'was', 'here', 'than', 'xa', 'use', 'might']
 
 stemmed_stopwords = []
 
 for i in my_stopwords:
     stemmed_stopwords.append(stemmer.stem(i))
 
-domain_terms = ['graphql', 'apollo', 'application', 'app', 'service', 'code', 'gql', 'data', 'object', 'project',
-                'schema', 'return', 'name', 'run', 'implement', 'call', 'api', 'file', 'write', 'follow', 'new',
-                'update', 'generate', 'class', 'user']
+domain_terms = ['graphql', 'apollo', 'gql', 'something', 'look', 'see', 'find', 'way', 'different', 'differ', 'foo',
+                'bar', 'baz', 'pet', 'example', 'call', 'follow', 'possible', 'know', 'c', 'value', 'api', 'seem',
+                'question', 'case', 'item', 'true', 'false', 'found', 'issue', 'problem', 'node', 'post', 'request',
+                'response', 'variable', 'div', 'page', 'app', 'server', 'client', 'send', 'let', 'think', 'require',
+                'null', 'object', 'result', 'number', 'success', 'input', 'book', 'import', 'export', 'boolean',
+                'author', 'title', 'int', 'default', 'e', 'person', 'async', 'age', 'country', 'city', 'address', 'r'
+                'song', 'artist', 'episode', 'friend', 'movie', 'employee', 'human', 'customer', 'vehicle', 'game'
+                'document', 'var', 'player', 'p', 'todo', 'req', 'res', 'go', 'actual', 'url', 'uri', 'print', 'run',
+                'contain', 'add', 'provide', 'pm', 'err', 'article', 'first', 'list', 'show', 'inside', 'path',
+                'detail', 'implement', 'context', 'text', 'action', 'description', 'time', 'file', 'mutate',
+                'mutation', 'user', 'option', 'create', 'price', 'application']
+
+# Refactor
+# domain_terms = ['name', 'string', 'public', 'int', 'x', 'y', 'f', 'n', 'b', 'c', 'j', 'g', 'v', 'h', 'i', 'see',
+#                 'something', 'might', 'z', 'k', 'i', "I", 'l', 'r', 'e', 'q', 'refactor', 'end', 'move', 'way',
+#                 'find']
 
 stemmed_domain_terms = []
+
 for i in domain_terms:
     stemmed_domain_terms.append(stemmer.stem(i))
 
+
 def compute_average_diagonal(matrix, dimension):
-    sum =0.0
+    sum = 0.0
     for i in range(0, dimension):
         sum += matrix[i][i]
-    average =sum/dimension
-    return  average
+    average = sum / dimension
+    return average
+
 
 def sent_to_words(sentences):
     for sentence in sentences:
@@ -135,57 +156,143 @@ class LDADocument:
 
 
 class SEALDAModel:
-    def __init__(self, training_data=None,  use_multicore=True, coherence=0.6, core=-1, iterations=50,
-                 model_file="graphql-posts.xlsx"):
+    def __init__(self, training_data=None, use_multicore=True, num_core=-1,
+                 model_name="graphql", source_file_format = "xlsx"):
+
         self.use_multicore = use_multicore
-        self.target_coherence = coherence
-        self.fileprefix="graphql"
-        if core ==-1:
+        self.model_name = model_name
+        if num_core == -1:
             self.workers = multiprocessing.cpu_count()
-        else: self.workers=core
+        else:
+            self.workers = num_core
 
-        self.iterations = iterations
-
+        file_format = self.model_name + "-posts." + source_file_format
         if (training_data is None):
-            self.training_data = self.read_data_from_oracle(model_file)
+            if source_file_format.__eq__("xlsx"):
+                self.training_data = self.read_data_from_xlsx(file_format)
+            else:
+                self.training_data = self.read_data_from_xml(file_format)
         else:
             self.training_data = training_data
 
         self.prepare_training_data()
 
-    def find_best_model(self,min_topic, max_topic, num_iterations):
-        best_model =None
-        best_cv=0.0
-        best_score_topic_count =0
-        score_chart_data =dict()
-        for topic_count in range(min_topic,max_topic):
-            best_score_for_n_topic=0
+    def find_best_model(self,
+                        min_topic,
+                        max_topic,
+                        step_topic,
+                        min_iteration,
+                        max_iteration,
+                        step_iteration,
+                        repetitions):
+        index = 1
+        current_best_model = None
+        current_best_cv = 0.0
+        current_best_iteration_count = 0
+        current_best_topic_count = 0
+        current_best_estimated_stability = 0.0
 
-            for iteration in range(0,num_iterations):
-                print("Num topics: "+ str(topic_count) +"\n Iteration: "+ str(iteration))
-                model =self.prepare_model(topic_count)
-                coherence = self.compute_coherence(model)
-                if coherence>best_score_for_n_topic:
-                    best_score_for_n_topic=coherence
-                    if coherence> best_cv:
-                        best_model=model
-                        best_cv=coherence
-                        best_score_topic_count=topic_count
-                print("CV score: "+ str(coherence))
-                print("Best CV score: " + str(best_cv) +" achieved with "+str(best_score_topic_count)+ " topics.")
-            score_chart_data[topic_count] =best_score_for_n_topic
-        self.model=best_model
-        return (best_model, best_score_topic_count, best_cv, score_chart_data)
+        # Determine best model [iterations, topics, cv and stability]
+        for iteration_count in range(min_iteration, max_iteration, step_iteration):
+            for topic_count in range(min_topic, max_topic, step_topic):
+                (self.model, cv, estimated_stability) = self.find_single_model(topic_count,
+                                                                               repetitions,
+                                                                               iteration_count)
+                if cv > current_best_cv:
+                    current_best_cv = cv
+                    current_best_model = self.model
+                    current_best_topic_count = topic_count
+                    current_best_iteration_count = iteration_count
+                    current_best_estimated_stability = estimated_stability
 
+                print("\t Iterations: ["
+                      + str(iteration_count)
+                      + "]\tNum Topics: ["
+                      + str(topic_count)
+                      + "],\tCV score: ["
+                      + str(cv) + "]")
 
+                current_cv_chart_data = str(iteration_count) \
+                                       + "," + str(topic_count) \
+                                       + "," + str(cv) \
+                                       + "_" + str(estimated_stability) \
+                                       + "_" + str(self.get_topics())
+
+                csv_file = self.model_name + "-cv_chart.csv"
+                try:
+                    with open(csv_file, 'a') as csvfile:
+                        csvfile.write(current_cv_chart_data + "\n")
+                except IOError:
+                    print("I/O error")
+
+                iteration_topic_name = str(iteration_count) + "_" + str(topic_count)
+                self.classify_documents(iteration_topic_name)
+                self.visualize(iteration_topic_name)
+                index += 1
+
+        print("Best num topics: " + str(current_best_topic_count))
+        print("Best iterations: " + str(current_best_iteration_count))
+        print("Best stability: " + str(current_best_estimated_stability))
+        print("Best cv: " + str(current_best_cv))
+
+        # Code to run LDA DE
+
+        # config = UserTestConfig()
+        # config["data_samples"] = self.token_collection
+        # config["learners_para_bounds"] = [(current_best_topic_count, current_best_topic_count), (0.1, 1), (0.01, 1)]
+        # learner_para = OrderedDict()
+        # learner_para["n_components"] = current_best_topic_count  # topics
+        # learner_para["doc_topic_prior"] = 0.1  # alpha
+        # learner_para["topic_word_prior"] = 0.01  # beta
+        # config["learners_para"] = learner_para
+        #
+        # config["ldaMultiWorkers"] = self.workers
+        # config["max_iter"] = current_best_iteration_count
+        #
+        # (ind, fit) = LDADE(config)
+        # print("Index" + str(ind))
+        # print("Fit" + str(fit))
+
+        return current_best_model, current_best_topic_count, current_best_iteration_count, current_best_cv,\
+            current_best_estimated_stability
+
+    def find_single_model(self, topic_count, repetitions=25, iteration_count=1000):
+        current_best_model = None
+        current_best_cv = 0
+        sum_stability = 0.0
+        estimated_stability = 0.0
+        prev_model = self.prepare_model(topic_count, iteration_count)
+        for repeat in range(0, repetitions):
+            self.model = self.prepare_model(topic_count, iteration_count)
+            cv = self.compute_coherence(self.model)
+            if cv > current_best_cv:
+                current_best_cv = cv
+                current_best_model = self.model
+            topic_similarity_score = self.get_jaccard_similarity(self.model, prev_model)
+            sum_stability += topic_similarity_score
+            prev_model = self.model
+            estimated_stability = sum_stability / repetitions
+
+            print("\t Repetition: ["
+                  + str(repeat)
+                  + "],\tCV score: "
+                  + str(cv)
+                  + "],\tAccumulated Stability: ["
+                  + str(estimated_stability)
+                  + "]")
+
+        return current_best_model, current_best_cv, estimated_stability
 
     def get_model(self):
         return self.model
 
-    def visualize(self):
+    def visualize(self, postfix):
         lda_display = ldvis.prepare(self.model, self.corpus, self.dictionary)
-        pyLDAvis.save_html(lda_display, self.fileprefix + ".html")
-        #pyLDAvis.display(lda_display)
+        pyLDAvis.save_html(lda_display, self.model_name + "_" + postfix + ".html")
+        # pyLDAvis.display(lda_display)
+
+    def get_topics(self):
+        return self.model.print_topics(num_words=10)
 
     def print_topics(self):
         print(self.model.print_topics(num_words=10))
@@ -208,34 +315,35 @@ class SEALDAModel:
         self.token_collection = replace_bigram(doc_collection)
 
         self.dictionary = corpora.Dictionary(self.token_collection)
+
         self.dictionary.filter_extremes(no_below=20, no_above=0.2, keep_n=20000)
         self.corpus = [self.dictionary.doc2bow(text) for text in self.token_collection]
         print("Finished data cleanup..")
 
-    def prepare_model(self, topic_count):
+    def prepare_model(self, topic_count, iteration_count):
         if (self.use_multicore):
             print('LDA MultiCore')
             ldamodel = LdaMulticore(self.corpus,
-                                     num_topics=topic_count,
-                                     id2word=self.dictionary,
-                                     passes=15,
-                                     workers=self.workers,
-                                     alpha='symmetric',
-                                     random_state=get_random_number(),
-                                     eta='auto')
-
+                                    num_topics=topic_count,
+                                    iterations=iteration_count,
+                                    id2word=self.dictionary,
+                                    passes=10,
+                                    workers=self.workers,
+                                    random_state=get_random_number(),
+                                    alpha='symmetric',
+                                    eta='auto')
         else:
             ldamodel = LMSingle(corpus=self.corpus,
-                                num_topics=self.num_topics,
+                                num_topics=topic_count,
+                                iterations=iteration_count,
                                 id2word=self.dictionary,
                                 random_state=get_random_number(),
-                                passes=50,
+                                passes=10,
                                 alpha='auto',
-                                eta='auto',
-                                iterations=self.iterations)
+                                eta='auto')
         return ldamodel
 
-    def compute_coherence(self,model):
+    def compute_coherence(self, model):
         coherencemodel = CoherenceModel(model=model, dictionary=self.dictionary, texts=self.token_collection,
                                         topn=15,
                                         coherence='c_v')
@@ -243,58 +351,59 @@ class SEALDAModel:
         return value
 
     def get_jaccard_similarity(self, model1, model2):
-        (differences, annotation)=model1.diff(model2, distance="jaccard", num_words=10, diagonal=True, annotation=True)
-        #print(differences)
-        avg_score = sum(differences)/len(differences)
-        return  avg_score
-
-
-    def estimate_model_stability(self, topic_count, repeat=10):
-        sum =0.0
-        model1 = self.prepare_model(topic_count)
-        for i in range(0,repeat): #create repeat models
-            model2 =self.prepare_model(topic_count)
-            topic_similarity_score =self.get_jaccard_similarity(model1,model2)
-            sum += topic_similarity_score
-            model1 =model2
-        avg_stability=sum/repeat
-        return  avg_stability
-
-
+        (differences, annotation) = model1.diff(model2, distance="jaccard", num_words=10, diagonal=True,
+                                                annotation=True)
+        # print(differences)
+        avg_score = sum(differences) / len(differences)
+        return avg_score
 
     def create_ensemble_model(self, topic_count):
         return EnsembleLda(
             epsilon=0.1,
-        corpus=self.corpus,
-        id2word=self.dictionary,
-        num_topics=topic_count,
-        passes=15,
-        num_models=10,
-        topic_model_class='ldamulticore',
-        ensemble_workers=self.workers,
-        distance_workers=self.workers)
+            corpus=self.corpus,
+            id2word=self.dictionary,
+            num_topics=topic_count,
+            passes=15,
+            num_models=10,
+            topic_model_class='ldamulticore',
+            ensemble_workers=self.workers,
+            distance_workers=self.workers)
 
-    def read_data_from_oracle(self,file):
+    def read_data_from_xlsx(self, file):
         dataframe = pd.read_excel(file)
         model_data = []
-        print("Reading data from oracle..")
+        print("Reading data from: " + file)
         for index, row in dataframe.iterrows():
             post_id = row["Id"]
             post_type = row["PostTypeId"]
             post_body = row["Body"]
-
             document = LDADocument(post_id, post_type, post_body)
             model_data.append(document)
         return model_data
 
-    def classify_documents(self):
-        df_topic_sents_keywords = self.format_topics_sentences()
+    def read_data_from_xml(self, file):
 
-        df_dominant_topic = df_topic_sents_keywords.reset_index()
+        model_data = []
+        print("Reading data from: " + file)
+
+        xml_iter = ElementTree.iterparse(file, ('start', 'end'))
+        for event, elem in xml_iter:
+            tag = elem.tag
+            if event == "start" and tag == "row":
+                post_id = elem.attrib["Id"]
+                post_body = elem.attrib["Body"]
+                post_type = elem.attrib["PostTypeId"]
+                document = LDADocument(post_id, post_type, post_body)
+                model_data.append(document)
+        return model_data
+
+    def classify_documents(self, postfix):
+        df_topic_sentences_keywords = self.format_topics_sentences()
+        df_dominant_topic = df_topic_sentences_keywords.reset_index()
         df_dominant_topic.columns = ['Document_No', 'Dominant_Topic', 'Topic_Perc_Contrib', 'Keywords', 'Original_id']
 
         # Show
-        df_dominant_topic.to_csv(self.fileprefix + "-document-to-topic.csv")
+        df_dominant_topic.to_csv(self.model_name + "_" + postfix + "-document-to-topic.csv")
 
     def format_topics_sentences(self):
         # Init output
@@ -338,42 +447,49 @@ class SEALDAModel:
 
 if __name__ == '__main__':
 
+    parser = argparse.ArgumentParser(description='SEA LDA Model')
 
-    parser = argparse.ArgumentParser(description='LDA Model')
-    parser.add_argument('--multicore', type=bool, help='Is Multicore', default=True)
-    parser.add_argument('--mintopic', type=int, help='Minimium number of Topics', default=6)
-    parser.add_argument('--maxtopic', type=int, help='Maximum number of Topics', default=20)
-    parser.add_argument('--core', type=int, help='CPU Threads', default=-1)
-    parser.add_argument('--iteration', type=int, help='Number of iterations', default=25)
+    # Configs -- Cores
+    parser.add_argument('--multicore', type=bool, help='Is multicore', default=True)
+    parser.add_argument('--numcore', type=int, help='CPU threads', default=-1)
+
+    # Configs -- Topics
+    parser.add_argument('--mintopic', type=int, help='Minimum number of topics', default=5)
+    parser.add_argument('--maxtopic', type=int, help='Maximum number of topics', default=51)
+    parser.add_argument('--steptopic', type=int, help='Step to increase the number of topics', default=5)
+
+    # Configs -- Iterations
+    parser.add_argument('--miniteration', type=int, help='Minimum number of iterations', default=500)
+    parser.add_argument('--maxiteration', type=int, help='Maximum number of iterations', default=2001)
+    parser.add_argument('--stepiteration', type=int, help='Maximum number of iterations', default=500)
+
+    # Configs -- Misc
+    parser.add_argument('--repetitions', type=int, help='Number of passes ', default=25)
+    parser.add_argument('--modelname', type=str, help='Name of the model', default="graphql")
+    parser.add_argument('--sourcefileformat', type=str, help='Format of the source file containing posts', default="xlsx")
 
     args = parser.parse_args()
     print("args: " + args.__str__())
 
-    multi_core = args.multicore
-    mintopic = args.mintopic
-    maxtopic = args.maxtopic
-    num_core = args.core
-    iterations = args.iteration
-
-    lda_trainer = SEALDAModel(use_multicore=multi_core,core=num_core, iterations=iterations)
-
-
-
-    (best_model, best_score_topic_count, best_cv,score_chart) =lda_trainer.find_best_model(mintopic,maxtopic, iterations)
-
-    best_model.print_topics()
-    print("Best CV score: "+ str(best_cv))
-    csv_file = "cv_chart.csv"
+    # Create cv chart file with top headers
+    csv_file = args.modelname + "-cv_chart.csv"
     try:
         with open(csv_file, 'w') as csvfile:
-            csvfile.write("topic_count, cv_score\n")
-            for key, value in score_chart.items():
-                csvfile.write(str(key) + ","+ str (value)+"\n")
+            csvfile.write("iteration_count, topic_count, cv_score, stability, topics\n")
     except IOError:
         print("I/O error")
-    best_model.classify_documents()
-    best_model.visualize()
 
-    estimated_stability = lda_trainer.estimate_model_stability(best_score_topic_count)
-    print(estimated_stability)
+    # Start SEAL-LDA
+    sea_lda = SEALDAModel(use_multicore=args.multicore,
+                          num_core=args.numcore,
+                          model_name=args.modelname,
+                          source_file_format=args.sourcefileformat)
 
+    (best_model, best_topic_count, best_iteration_count, best_cv, best_estimated_stability) = \
+        sea_lda.find_best_model(min_topic=args.mintopic,
+                                max_topic=args.maxtopic,
+                                step_topic=args.steptopic,
+                                min_iteration=args.miniteration,
+                                max_iteration=args.maxiteration,
+                                step_iteration=args.stepiteration,
+                                repetitions=args.repetitions)
